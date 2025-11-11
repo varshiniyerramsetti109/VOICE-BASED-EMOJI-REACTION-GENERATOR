@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Emoji Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Voice-Based Emoji Reaction Generator 🎤</h1>
+        <p>Click the button and say something. We'll generate an emoji based on your tone!</p>
+        
+        <button id="start-btn">
+            <i class="fas fa-microphone"></i> Start Listening
+        </button>
+
+        <div id="result">
+            <p id="transcript-label">You said:</p>
+            <p id="transcript">- - -</p>
+            <p id="reaction-label">My Reaction:</p>
+            <div id="emoji-reaction">🤔</div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const startBtn = document.getElementById('start-btn');
+        const transcriptEl = document.getElementById('transcript');
+        const emojiReactionEl = document.getElementById('emoji-reaction');
+        const micIcon = startBtn.querySelector('i');
+
+        // Check for browser support for the Web Speech API
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Sorry, your browser doesn't support speech recognition. Try Chrome or Edge.");
+            startBtn.disabled = true;
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false; // Stop listening after one phrase
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+
+            // Event listener for the start button
+            startBtn.addEventListener('click', () => {
+                transcriptEl.textContent = 'Listening...';
+                emojiReactionEl.textContent = '🤔';
+                micIcon.classList.add('fa-beat'); // Animate icon
+                startBtn.disabled = true;
+                recognition.start();
+            });
+
+            // Event handler for when speech is recognized
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                transcriptEl.textContent = `"${transcript}"`;
+                sendTextToServer(transcript);
+            };
+
+            // Event handler for when listening ends
+            recognition.onend = () => {
+                micIcon.classList.remove('fa-beat');
+                startBtn.disabled = false;
+            };
+
+            // Event handler for errors
+            recognition.onerror = (event) => {
+                transcriptEl.textContent = `Error: ${event.error}`;
+            };
+        }
+
+        // Function to send the transcribed text to the Python backend
+        async function sendTextToServer(text) {
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                emojiReactionEl.textContent = data.emoji; // Update emoji on the page
+            
+            } catch (error) {
+                console.error("Error sending text to server:", error);
+                emojiReactionEl.textContent = '❌';
+                transcriptEl.textContent = 'Could not connect to the server.';
+            }
+        }
+    </script>
+
+</body>
+</html>
